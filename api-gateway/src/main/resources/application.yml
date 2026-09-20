@@ -1,0 +1,21 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+orderstream:
+  jwt:
+    # MUST be byte-for-byte identical to the secret in auth-service.
+    secret: "change-me-in-production-orderstream-demo-secret-key-2026"
+  services:
+    auth: http://localhost:8081
+    restaurant: http://localhost:8082
+    order: http://localhost:8083
+  cors:
+    allowed-origin: http://localhost:4200
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
