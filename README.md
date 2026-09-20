@@ -45,6 +45,15 @@ docker compose -f docker-compose.full.yml up --build -d
 
 Then open <http://localhost:4300>.
 
+**Working on the frontend only** (whole backend in Docker, Angular dev server on the host):
+
+```bash
+docker compose -f docker-compose.full.yml -f docker-compose.dev.yml up -d
+cd frontend && npm start
+```
+
+Then open <http://localhost:4200>. The override file points the gateway's allowed CORS origin at `:4200` and keeps the containerised frontend out of the way, so the dev server owns that port and hot reload works against the real backend.
+
 **For development** (infrastructure in Docker, services on the host):
 
 ```bash

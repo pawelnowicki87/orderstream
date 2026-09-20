@@ -1,0 +1,16 @@
+# Overrides for working on the Angular app locally while the whole backend runs
+# in Docker. The dev server (npm start) serves the app on :4200, so the gateway
+# has to accept that origin instead of the containerised frontend's :4300.
+#
+#   docker compose -f docker-compose.full.yml -f docker-compose.dev.yml up -d
+#   cd frontend && npm start
+#
+# The frontend container is parked behind a profile here, so the command above
+# starts the backend only and nothing competes for the app's port.
+services:
+  api-gateway:
+    environment:
+      ORDERSTREAM_CORS_ALLOWED-ORIGIN: http://localhost:4200
+
+  frontend:
+    profiles: ["containerised-frontend"]
