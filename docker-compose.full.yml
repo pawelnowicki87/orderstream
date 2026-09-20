@@ -35,6 +35,7 @@ services:
     build: ./auth-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,6 +44,7 @@ services:
     build: ./restaurant-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/restaurant_db
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +55,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/order_db
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       GRPC_CLIENT_RESTAURANT-SERVICE_ADDRESS: "static://restaurant-service:9090"
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,6 +70,7 @@ services:
       - "8084:8084"
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
     depends_on:
       kafka:
         condition: service_started
@@ -80,6 +84,7 @@ services:
       ORDERSTREAM_SERVICES_RESTAURANT: http://restaurant-service:8082
       ORDERSTREAM_SERVICES_ORDER: http://order-service:8083
       ORDERSTREAM_CORS_ALLOWED-ORIGIN: http://localhost:4300
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
     depends_on:
       - auth-service
       - restaurant-service
