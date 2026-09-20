@@ -1,1 +1,70 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --bg: #0f1115;
+  --surface: #181b22;
+  --surface-2: #21252e;
+  --border: #2d323d;
+  --text: #e8eaed;
+  --muted: #9aa0ab;
+  --accent: #ff6b35;
+  --accent-dim: #c94f22;
+  --ok: #34d399;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover { background: var(--accent-dim); }
+button:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+button.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.95rem;
+  width: 100%;
+}
+
+a { color: var(--accent); text-decoration: none; }
+
+.muted { color: var(--muted); }
+.error { color: #f87171; margin: 0.5rem 0; }
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
