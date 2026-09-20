@@ -1,0 +1,33 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: jdbc:postgresql://localhost:5433/order_db
+    username: orderstream
+    password: orderstream
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+grpc:
+  client:
+    restaurant-service:
+      address: "static://localhost:9090"
+      negotiation-type: plaintext
+
+orderstream:
+  kafka:
+    topic: order-events
+  demo:
+    # Advances each active order to its next status on this interval,
+    # so the live tracking screen moves on its own during a demo.
+    advance-interval-ms: 15000
