@@ -81,6 +81,12 @@ The development compose file publishes PostgreSQL on host port **5433** (the con
 
 Design decisions and their trade-offs are written up in [DLACZEGO.md](DLACZEGO.md) (in Polish).
 
+## Deployment
+
+- [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) — Vercel for the frontend, Railway for the services, Neon for Postgres and Redpanda for the Kafka API. Written to fit inside a $20/month usage budget.
+- [DEPLOY.md](DEPLOY.md) — everything on one VPS with `docker compose`, behind nginx and certbot.
+
+
 ## Deliberate simplifications
 
 This is a portfolio project, not a production system. The following are conscious trade-offs rather than oversights:

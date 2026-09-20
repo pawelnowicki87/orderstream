@@ -1,5 +1,6 @@
 server:
-  port: 8084
+  # Railway injects PORT for services with a public domain.
+  port: ${PORT:8084}
 
 spring:
   application:

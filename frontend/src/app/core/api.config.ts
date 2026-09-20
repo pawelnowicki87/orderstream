@@ -1,9 +1,10 @@
-const isLocalDev = window.location.port === '4200';
+import { environment } from '../../environments/environment';
 
-// In development the Angular dev server runs on 4200 and the backend on 8080/8084.
-// In production everything is served from one origin behind a reverse proxy.
-export const API_BASE_URL = isLocalDev ? 'http://localhost:8080' : '';
+// Development uses the URLs baked into environment.ts; production builds get them
+// from environment.prod.ts, which scripts/generate-env.mjs writes from env vars.
+// An empty apiBaseUrl means "same origin", which is how the nginx container serves it.
+export const API_BASE_URL = environment.apiBaseUrl;
 
-export const WS_URL = isLocalDev
-  ? 'ws://localhost:8084/ws'
-  : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
+export const WS_URL =
+  environment.wsUrl ||
+  `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;

@@ -42,3 +42,6 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# generated at build time by scripts/generate-env.mjs
+src/environments/environment.prod.ts

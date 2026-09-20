@@ -1,5 +1,6 @@
 server:
-  port: 8082
+  # Railway injects PORT for services with a public domain.
+  port: ${PORT:8082}
 
 spring:
   application:
@@ -16,3 +17,6 @@ spring:
 grpc:
   server:
     port: 9090
+    # '*' binds every interface. Railway's private network is IPv6, so if the client
+    # cannot reach this server there, set GRPC_SERVER_ADDRESS to "::".
+    address: ${GRPC_SERVER_ADDRESS:*}
