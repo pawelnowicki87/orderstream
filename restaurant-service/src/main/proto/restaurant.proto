@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package restaurant;
+
+option java_multiple_files = true;
+option java_package = "com.orderstream.grpc";
+option java_outer_classname = "RestaurantProto";
+
+service RestaurantGrpcService {
+  rpc ValidateOrder (ValidateOrderRequest) returns (ValidateOrderResponse);
+}
+
+message ValidateOrderRequest {
+  int64 restaurant_id = 1;
+  repeated OrderItemRequest items = 2;
+}
+
+message OrderItemRequest {
+  int64 menu_item_id = 1;
+  int32 quantity = 2;
+}
+
+message ValidateOrderResponse {
+  bool valid = 1;
+  string message = 2;
+  int64 total_cents = 3;
+  string restaurant_name = 4;
+}
