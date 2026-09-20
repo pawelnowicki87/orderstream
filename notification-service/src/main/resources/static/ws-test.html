@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OrderStream WebSocket test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; }
+        #log { background: #111; color: #0f0; padding: 1rem; font-family: monospace;
+               white-space: pre-wrap; min-height: 200px; }
+    </style>
+</head>
+<body>
+<h1>OrderStream WebSocket test</h1>
+<p>Order id to watch: <input id="orderId" value="1"> <button onclick="connect()">Connect</button></p>
+<div id="log">not connected</div>
+
+<script>
+    let client;
+
+    function log(message) {
+        document.getElementById('log').textContent += '\n' + message;
+    }
+
+    function connect() {
+        const orderId = document.getElementById('orderId').value;
+        document.getElementById('log').textContent = 'connecting...';
+
+        client = new StompJs.Client({
+            brokerURL: 'ws://localhost:8084/ws',
+            onConnect: () => {
+                log('connected, subscribing to /topic/orders/' + orderId);
+                client.subscribe('/topic/orders/' + orderId, (message) => {
+                    log('EVENT: ' + message.body);
+                });
+            },
+            onStompError: (frame) => log('STOMP error: ' + frame.headers['message'])
+        });
+        client.activate();
+    }
+</script>
+</body>
+</html>
