@@ -81,6 +81,20 @@ Test integracyjny (`OrderFlowIntegrationTest`) idzie w drugą stronę: prawdziwy
 
 Wywołanie gRPC jest w tym teście zamockowane, bo `restaurant-service` to osobny proces, a ten test sprawdza zachowanie `order-service`.
 
+## Dlaczego panel „What just happened in the backend"
+
+Demo aplikacji z mikroserwisami ma jeden wrodzony problem: cała wartość siedzi w miejscach, których nie widać. Osoba oglądająca demo klika „zamów", widzi zmieniający się napis i nie ma pojęcia, że po drodze było wywołanie gRPC, zdarzenie w Kafce i push przez WebSocket. Panel rysuje tę ścieżkę w chwili, gdy zdarzenie faktycznie przychodzi — nie jest to animacja „na pokaz" odpalana z timera, tylko reakcja na prawdziwą wiadomość z `/topic/orders/{id}`.
+
+Czas „ms end to end" w logu to różnica między `occurredAt` (ustawianym w `order-service` przy publikacji) a chwilą odebrania wiadomości w przeglądarce. Obejmuje więc Kafkę, konsumenta i WebSocket. Zegary serwera i przeglądarki mogą się różnić, dlatego wartości ujemne albo absurdalnie duże są ukrywane zamiast pokazywane.
+
+## Dlaczego jedno połączenie WebSocket na całą aplikację
+
+`StompService` trzyma jedno połączenie i rozdaje subskrypcje. Strona śledzenia słucha `/topic/orders/{id}`, a powłoka aplikacji równolegle `/topic/users/{id}` — z tego drugiego biorą się powiadomienia na każdej stronie. Osobne połączenie dla każdego widoku działałoby, ale mnożyłoby sockety i gubiło subskrypcje po restarcie backendu. Serwis po ponownym połączeniu sam podpina wszystkie aktywne subskrypcje.
+
+## Dlaczego konto demo zamiast wspólnego loginu „demo/demo"
+
+Wspólne konto oznaczałoby, że dwie osoby oglądające demo w tym samym czasie widzą nawzajem swoje zamówienia i powiadomienia. Przycisk „Try the demo" rejestruje więc za każdym razem nowego, losowego użytkownika. Kosztem jest rosnąca tabela `app_users` — przy ruchu z portfolio to bez znaczenia.
+
 ---
 
 # Nieoczywiste miejsca w konfiguracji

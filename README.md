@@ -1,6 +1,35 @@
+<div align="center">
+
+<img src="frontend/public/favicon.svg" width="64" alt="">
+
 # OrderStream
 
-A food-ordering system built as five Spring Boot microservices with an Angular frontend, demonstrating **synchronous gRPC** and **asynchronous Kafka** communication side by side, with live order tracking pushed to the browser over WebSocket.
+**Order food and watch it travel through five microservices in real time.**
+
+![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-6DB33F?logo=springboot&logoColor=white)
+![gRPC](https://img.shields.io/badge/gRPC-protobuf-244C5A)
+![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-3.9-231F20?logo=apachekafka&logoColor=white)
+![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+
+<img src="docs/images/demo.gif" width="800" alt="Placing an order: the request lights up api-gateway, order-service and restaurant-service, then each status change travels through Kafka and a WebSocket to the browser">
+
+</div>
+
+## What you are looking at
+
+A food-ordering system built as five Spring Boot microservices with an Angular frontend. It exists to show **synchronous gRPC** and **asynchronous Kafka** communication side by side, and to make them visible:
+
+- **The price comes from gRPC.** When you order, `order-service` calls `restaurant-service` synchronously to validate the dishes and compute the total. The browser never sends a price.
+- **Every status change is a Kafka event.** `order-service` publishes, `notification-service` consumes and pushes it to your tab over WebSocket — the tracking page measures that trip end to end, usually in 10–20 ms.
+- **The backend map lights up as it happens.** The panel next to the order draws the path each event took, so what is normally invisible in a demo is the main thing on screen.
+- **One click to try it.** "Try the demo" creates a throwaway account, so nobody has to fill in a form to see it work.
+
+| Browsing | Ordering |
+|---|---|
+| ![Home page with restaurants](docs/images/home.png) | ![Menu with a filled cart](docs/images/menu.png) |
 
 ## Architecture
 
@@ -97,3 +126,4 @@ This is a portfolio project, not a production system. The following are consciou
 - **`enableSimpleBroker`** is an in-memory STOMP broker, so WebSocket state is per-instance. Running more than one notification-service would require an external broker such as RabbitMQ.
 - **Order progress is simulated** by a scheduled job, since there is no real kitchen or courier.
 - **The proto file is duplicated** between the two services instead of living in a shared module. See DLACZEGO.md.
+- **Demo accounts are throwaway.** "Try the demo" registers a random `demo-…@orderstream.dev` user so visitors never see each other's orders; nothing cleans them up.

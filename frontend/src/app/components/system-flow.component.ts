@@ -76,7 +76,7 @@ export class SystemFlowComponent implements OnDestroy {
     { id: 'gateway-order', d: 'M350,47 L388,47', label: 'REST', lx: 369, ly: 40 },
     { id: 'order-restaurant', d: 'M540,47 L588,47', label: 'gRPC', lx: 564, ly: 40 },
     { id: 'order-kafka', d: 'M465,74 L465,168', label: 'publish', lx: 497, ly: 125 },
-    { id: 'kafka-notification', d: 'M390,197 L352,197', label: 'consume', lx: 371, ly: 190 },
+    { id: 'kafka-notification', d: 'M390,197 L352,197', label: 'consume', lx: 371, ly: 240 },
     { id: 'notification-browser', d: 'M200,197 L85,197 L85,76', label: 'WebSocket', lx: 135, ly: 190 }
   ];
 

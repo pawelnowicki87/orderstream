@@ -14,7 +14,7 @@ import { OrderStatusEvent, STATUS_META } from './core/models';
     <header class="site-header">
       <div class="container row header-inner">
         <a routerLink="/restaurants" class="brand">
-          <span class="brand-mark">🛵</span> OrderStream
+          <img class="brand-mark" src="favicon.svg" alt="" width="32" height="32"> OrderStream
         </a>
         <nav class="nav">
           <a routerLink="/restaurants" routerLinkActive="active">Restaurants</a>
@@ -88,7 +88,12 @@ export class App {
   }
 
   private notify(event: OrderStatusEvent): void {
-    // The tracking page for this order already shows the change; a toast there is noise.
+    // PLACED always follows the user's own click, and it arrives while the router is still
+    // navigating to the tracking page — a toast for it would only ever be noise.
+    if (event.status === 'PLACED') {
+      return;
+    }
+    // The tracking page for this order already shows the change.
     if (this.router.url.startsWith(`/orders/${event.orderId}`)) {
       return;
     }
