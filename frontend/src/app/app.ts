@@ -1,31 +1,103 @@
-import { Component, inject } from '@angular/core';
-import { RouterLink, RouterOutlet } from '@angular/router';
+import { Component, DestroyRef, effect, inject } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { AuthService } from './core/auth.service';
+import { StompService } from './core/stomp.service';
+import { ToastService } from './core/toast.service';
+import { OrderStatusEvent, STATUS_META } from './core/models';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: `
-    <header style="border-bottom: 1px solid var(--border);">
-      <div class="container row" style="padding-top: 1rem; padding-bottom: 1rem;">
-        <a routerLink="/restaurants" style="font-weight: 700; font-size: 1.2rem;">OrderStream</a>
-        <nav style="display: flex; align-items: center; gap: 1rem;">
-          <a routerLink="/restaurants">Restaurants</a>
+    <header class="site-header">
+      <div class="container row header-inner">
+        <a routerLink="/restaurants" class="brand">
+          <span class="brand-mark">🛵</span> OrderStream
+        </a>
+        <nav class="nav">
+          <a routerLink="/restaurants" routerLinkActive="active">Restaurants</a>
           @if (auth.isLoggedIn()) {
-            <a routerLink="/orders">My orders</a>
-            <span class="muted">{{ auth.user()?.fullName }}</span>
-            <button class="ghost" (click)="auth.logout()">Sign out</button>
+            <a routerLink="/orders" routerLinkActive="active">My orders</a>
+            <span class="user-chip" [title]="auth.user()?.email ?? ''">
+              @if (stomp.connected()) {
+                <span class="dot live" title="Live updates connected"></span>
+              }
+              {{ auth.user()?.fullName }}
+            </span>
+            <button class="ghost small" (click)="auth.logout()">Sign out</button>
           } @else {
-            <a routerLink="/login">Sign in</a>
+            <a routerLink="/login" routerLinkActive="active">Sign in</a>
           }
         </nav>
       </div>
     </header>
 
-    <router-outlet />
+    <main>
+      <router-outlet />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        Spring Boot microservices · gRPC · Kafka · WebSocket · Angular — a portfolio project.
+      </div>
+    </footer>
+
+    <div class="toast-stack" aria-live="polite">
+      @for (toast of toasts.toasts(); track toast.id) {
+        <div class="toast" role="status">
+          <span class="toast-icon">{{ toast.icon }}</span>
+          <div class="toast-body">
+            <strong>{{ toast.title }}</strong>
+            <p>{{ toast.message }}</p>
+            @if (toast.link) {
+              <a [routerLink]="toast.link" (click)="toasts.dismiss(toast.id)">Track it →</a>
+            }
+          </div>
+          <button class="toast-close" (click)="toasts.dismiss(toast.id)" aria-label="Dismiss">×</button>
+        </div>
+      }
+    </div>
   `
 })
 export class App {
+
   readonly auth = inject(AuthService);
+  readonly stomp = inject(StompService);
+  readonly toasts = inject(ToastService);
+  private readonly router = inject(Router);
+
+  private userEvents?: Subscription;
+
+  constructor() {
+    // Follow the signed-in user's orders wherever they are in the app, so a status change
+    // shows up as a notification even while browsing another restaurant.
+    effect(() => {
+      const userId = this.auth.user()?.userId;
+      this.userEvents?.unsubscribe();
+      this.userEvents = undefined;
+
+      if (userId) {
+        this.userEvents = this.stomp.watch<OrderStatusEvent>(`/topic/users/${userId}`)
+          .subscribe(event => this.notify(event));
+      }
+    });
+
+    inject(DestroyRef).onDestroy(() => this.userEvents?.unsubscribe());
+  }
+
+  private notify(event: OrderStatusEvent): void {
+    // The tracking page for this order already shows the change; a toast there is noise.
+    if (this.router.url.startsWith(`/orders/${event.orderId}`)) {
+      return;
+    }
+    const meta = STATUS_META[event.status];
+    this.toasts.show({
+      icon: meta.icon,
+      title: `Order #${event.orderId} · ${meta.label}`,
+      message: `${event.restaurantName} — ${meta.blurb.toLowerCase()}.`,
+      link: `/orders/${event.orderId}`
+    });
+  }
 }

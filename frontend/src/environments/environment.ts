@@ -5,4 +5,6 @@ export const environment = {
   production: false,
   apiBaseUrl: 'http://localhost:8080',
   wsUrl: 'ws://localhost:8084/ws',
+  // Link to the source code shown in the hero. Empty hides the button.
+  repoUrl: '',
 };

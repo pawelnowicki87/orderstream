@@ -28,6 +28,18 @@ export class AuthService {
       .pipe(tap(response => this.store(response)));
   }
 
+  /**
+   * One-click access for people who just want to see the app work. Each visitor gets a fresh
+   * throwaway account, so two people trying the demo at once never see each other's orders.
+   */
+  demoLogin(): Observable<AuthResponse> {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    return this.register(
+      `demo-${suffix}@orderstream.dev`,
+      crypto.randomUUID(),
+      'Demo visitor');
+  }
+
   logout(): void {
     localStorage.removeItem(STORAGE_KEY);
     this.currentUser.set(null);

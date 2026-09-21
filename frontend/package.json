@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "node scripts/generate-env.mjs && ng build",
+    "build": "node scripts/generate-env.mjs && ng build && node scripts/inject-site-url.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "build:dev": "ng build --configuration development"

@@ -1,36 +1,49 @@
-import { Component, OnInit, computed, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Observable, of, switchMap } from 'rxjs';
 import { RestaurantService } from '../core/restaurant.service';
 import { OrderService } from '../core/order.service';
 import { AuthService } from '../core/auth.service';
-import { RestaurantDetail } from '../core/models';
+import { AuthResponse, RestaurantDetail, formatPrice } from '../core/models';
 
 @Component({
   selector: 'app-restaurant-detail',
   standalone: true,
+  imports: [RouterLink],
   template: `
-    <div class="container">
-      @if (restaurant(); as r) {
-        <h2>{{ r.name }}</h2>
-        <p class="muted">{{ r.cuisine }}</p>
+    @if (restaurant(); as r) {
+      <section class="restaurant-banner" [style.background-image]="'url(' + r.imageUrl + ')'">
+        <div class="container banner-inner">
+          <a routerLink="/restaurants" class="back-link light">← All restaurants</a>
+          <span class="chip">{{ r.cuisine }}</span>
+          <h1>{{ r.name }}</h1>
+          <p>{{ availableCount() }} dishes available today</p>
+        </div>
+      </section>
 
-        <div style="display: grid; gap: 0.75rem; margin-top: 1rem;">
+      <div class="container menu-page">
+        <div class="menu-list">
           @for (item of r.menu; track item.id) {
-            <div class="card row">
-              <div>
-                <strong>{{ item.name }}</strong>
-                <div class="muted" style="font-size: 0.9rem;">{{ item.description }}</div>
-                <div style="margin-top: 0.25rem;">{{ formatPrice(item.priceCents) }}</div>
-                @if (!item.available) {
-                  <div class="error" style="font-size: 0.85rem;">Currently unavailable</div>
-                }
+            <div class="card menu-item" [class.sold-out]="!item.available"
+                 [class.in-cart]="quantityOf(item.id) > 0">
+              <div class="menu-item-text">
+                <div class="menu-item-head">
+                  <strong>{{ item.name }}</strong>
+                  @if (!item.available) {
+                    <span class="badge">Sold out</span>
+                  }
+                </div>
+                <p class="muted small">{{ item.description }}</p>
+                <span class="price">{{ price(item.priceCents) }}</span>
               </div>
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <button class="ghost" (click)="changeQuantity(item.id, -1)"
-                        [disabled]="!item.available || quantityOf(item.id) === 0">-</button>
-                <span style="min-width: 1.5rem; text-align: center;">{{ quantityOf(item.id) }}</span>
-                <button class="ghost" (click)="changeQuantity(item.id, 1)"
-                        [disabled]="!item.available">+</button>
+              <div class="stepper">
+                <button class="ghost round" (click)="changeQuantity(item.id, -1)"
+                        [disabled]="!item.available || quantityOf(item.id) === 0"
+                        [attr.aria-label]="'Remove one ' + item.name">−</button>
+                <span class="qty">{{ quantityOf(item.id) }}</span>
+                <button class="round" (click)="changeQuantity(item.id, 1)"
+                        [disabled]="!item.available"
+                        [attr.aria-label]="'Add one ' + item.name">+</button>
               </div>
             </div>
           }
@@ -39,23 +52,39 @@ import { RestaurantDetail } from '../core/models';
         @if (error()) {
           <p class="error">{{ error() }}</p>
         }
-
-        <div class="card row" style="margin-top: 1rem;">
-          <strong>Total: {{ formatPrice(estimatedTotal()) }}</strong>
-          <button (click)="placeOrder()" [disabled]="itemCount() === 0 || placing()">
-            {{ placing() ? 'Placing...' : 'Place order' }}
-          </button>
-        </div>
-        <p class="muted" style="font-size: 0.85rem;">
-          The final price is calculated by restaurant-service over gRPC, not by this page.
+        <p class="muted small price-note">
+          The total you see is an estimate — the real price is calculated by restaurant-service
+          over gRPC when you order, so it cannot be tampered with in the browser.
         </p>
-      } @else {
-        <p class="muted">Loading...</p>
+      </div>
+
+      @if (itemCount() > 0) {
+        <div class="order-bar">
+          <div class="container order-bar-inner">
+            <div>
+              <strong>{{ itemCount() }} {{ itemCount() === 1 ? 'item' : 'items' }}</strong>
+              <span class="muted"> · {{ price(estimatedTotal()) }}</span>
+            </div>
+            <button (click)="placeOrder()" [disabled]="placing()">
+              {{ placing() ? 'Placing your order…' : (auth.isLoggedIn() ? 'Place order →' : 'Order as demo visitor →') }}
+            </button>
+          </div>
+        </div>
       }
-    </div>
+    } @else if (error()) {
+      <div class="container"><p class="error">{{ error() }}</p></div>
+    } @else {
+      <div class="restaurant-banner skeleton"></div>
+    }
   `
 })
 export class RestaurantDetailComponent implements OnInit {
+
+  readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly restaurantService = inject(RestaurantService);
+  private readonly orderService = inject(OrderService);
 
   readonly restaurant = signal<RestaurantDetail | null>(null);
   readonly quantities = signal<Record<number, number>>({});
@@ -65,17 +94,13 @@ export class RestaurantDetailComponent implements OnInit {
   readonly itemCount = computed(() =>
     Object.values(this.quantities()).reduce((sum, q) => sum + q, 0));
 
+  readonly availableCount = computed(() =>
+    (this.restaurant()?.menu ?? []).filter(item => item.available).length);
+
   readonly estimatedTotal = computed(() => {
     const menu = this.restaurant()?.menu ?? [];
     return menu.reduce((sum, item) => sum + item.priceCents * (this.quantities()[item.id] ?? 0), 0);
   });
-
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private restaurantService: RestaurantService,
-    private orderService: OrderService,
-    private auth: AuthService) {}
 
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -96,16 +121,11 @@ export class RestaurantDetailComponent implements OnInit {
     });
   }
 
-  formatPrice(cents: number): string {
-    return (cents / 100).toFixed(2) + ' zl';
+  price(cents: number): string {
+    return formatPrice(cents);
   }
 
   placeOrder(): void {
-    if (!this.auth.isLoggedIn()) {
-      this.router.navigate(['/login']);
-      return;
-    }
-
     const restaurantId = this.restaurant()?.id;
     if (!restaurantId) {
       return;
@@ -118,10 +138,15 @@ export class RestaurantDetailComponent implements OnInit {
     this.placing.set(true);
     this.error.set(null);
 
-    this.orderService.place({ restaurantId, items }).subscribe({
+    // A visitor who is not signed in gets a demo account on the spot instead of a detour
+    // through a registration form — the cart they built is kept.
+    const signedIn: Observable<AuthResponse | null> =
+      this.auth.isLoggedIn() ? of(null) : this.auth.demoLogin();
+
+    signedIn.pipe(switchMap(() => this.orderService.place({ restaurantId, items }))).subscribe({
       next: (order) => {
         this.placing.set(false);
-        this.router.navigate(['/orders', order.id]);
+        this.router.navigate(['/orders', order.id], { state: { justPlaced: true } });
       },
       error: (err) => {
         this.placing.set(false);

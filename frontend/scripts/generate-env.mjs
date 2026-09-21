@@ -3,6 +3,7 @@
 //
 //   API_BASE_URL  e.g. https://orderstream-gateway.up.railway.app   (no trailing slash)
 //   WS_URL        e.g. wss://orderstream-notifications.up.railway.app/ws
+//   REPO_URL      e.g. https://github.com/<you>/orderstream  (optional, shows "View source")
 //
 // Leaving API_BASE_URL empty makes the app use relative paths, which is what you want
 // when something in front of it (an nginx container, a reverse proxy) serves the API
@@ -16,6 +17,7 @@ const target = resolve(here, '../src/environments/environment.prod.ts');
 
 const apiBaseUrl = (process.env.API_BASE_URL ?? '').replace(/\/$/, '');
 const wsUrl = process.env.WS_URL ?? '';
+const repoUrl = process.env.REPO_URL ?? '';
 
 if (!wsUrl) {
   console.warn(
@@ -30,6 +32,7 @@ export const environment = {
   production: true,
   apiBaseUrl: ${JSON.stringify(apiBaseUrl)},
   wsUrl: ${JSON.stringify(wsUrl)},
+  repoUrl: ${JSON.stringify(repoUrl)},
 };
 `;
 
