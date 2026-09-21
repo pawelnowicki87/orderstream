@@ -150,7 +150,11 @@ export class RestaurantDetailComponent implements OnInit {
       },
       error: (err) => {
         this.placing.set(false);
-        this.error.set(err?.error?.message ?? 'Could not place the order.');
+        // On 401 the interceptor has already dropped the dead session, so the button now
+        // offers a fresh demo account and the cart is still here.
+        this.error.set(err?.status === 401
+          ? 'Your session expired. Your cart is still here — place the order again to continue.'
+          : err?.error?.message ?? 'Could not place the order.');
       }
     });
   }

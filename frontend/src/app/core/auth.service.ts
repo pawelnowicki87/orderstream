@@ -6,6 +6,29 @@ import { AuthResponse } from './models';
 
 const STORAGE_KEY = 'orderstream.auth';
 
+/** setTimeout stores its delay in a signed 32-bit integer; anything longer fires immediately. */
+const MAX_TIMER_MS = 2_147_483_647;
+
+/**
+ * Reads the `exp` claim (seconds since epoch) from a JWT. The browser cannot verify the
+ * signature and does not need to — the gateway does that. This is only about knowing when
+ * the session stops working, so the UI does not keep claiming the user is signed in.
+ */
+function expiresAt(token: string): number | null {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const claims = JSON.parse(atob(payload)) as { exp?: unknown };
+    return typeof claims.exp === 'number' ? claims.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+function isExpired(token: string): boolean {
+  const expiry = expiresAt(token);
+  return expiry !== null && expiry <= Date.now();
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
 
@@ -14,7 +37,14 @@ export class AuthService {
   readonly user = this.currentUser.asReadonly();
   readonly isLoggedIn = computed(() => this.currentUser() !== null);
 
-  constructor(private http: HttpClient) {}
+  private expiryTimer?: ReturnType<typeof setTimeout>;
+
+  constructor(private http: HttpClient) {
+    const restored = this.currentUser();
+    if (restored) {
+      this.scheduleExpiry(restored.token);
+    }
+  }
 
   register(email: string, password: string, fullName: string): Observable<AuthResponse> {
     return this.http
@@ -41,6 +71,7 @@ export class AuthService {
   }
 
   logout(): void {
+    clearTimeout(this.expiryTimer);
     localStorage.removeItem(STORAGE_KEY);
     this.currentUser.set(null);
   }
@@ -52,6 +83,16 @@ export class AuthService {
   private store(response: AuthResponse): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(response));
     this.currentUser.set(response);
+    this.scheduleExpiry(response.token);
+  }
+
+  /** A tab left open past the token's lifetime flips to signed-out on its own. */
+  private scheduleExpiry(token: string): void {
+    clearTimeout(this.expiryTimer);
+    const expiry = expiresAt(token);
+    if (expiry !== null) {
+      this.expiryTimer = setTimeout(() => this.logout(), Math.min(expiry - Date.now(), MAX_TIMER_MS));
+    }
   }
 
   private readFromStorage(): AuthResponse | null {
@@ -60,7 +101,12 @@ export class AuthService {
       return null;
     }
     try {
-      return JSON.parse(raw) as AuthResponse;
+      const session = JSON.parse(raw) as AuthResponse;
+      if (isExpired(session.token)) {
+        localStorage.removeItem(STORAGE_KEY);
+        return null;
+      }
+      return session;
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       return null;
