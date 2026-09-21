@@ -6,6 +6,7 @@
 
 **Order food and watch it travel through five microservices in real time.**
 
+[![CI](https://github.com/pawelnowicki87/orderstream/actions/workflows/ci.yml/badge.svg)](https://github.com/pawelnowicki87/orderstream/actions/workflows/ci.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-6DB33F?logo=springboot&logoColor=white)
 ![gRPC](https://img.shields.io/badge/gRPC-protobuf-244C5A)
