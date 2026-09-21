@@ -83,7 +83,7 @@ Wywołanie gRPC jest w tym teście zamockowane, bo `restaurant-service` to osobn
 
 ## Dlaczego panel „What just happened in the backend"
 
-Demo aplikacji z mikroserwisami ma jeden wrodzony problem: cała wartość siedzi w miejscach, których nie widać. Osoba oglądająca demo klika „zamów", widzi zmieniający się napis i nie ma pojęcia, że po drodze było wywołanie gRPC, zdarzenie w Kafce i push przez WebSocket. Panel rysuje tę ścieżkę w chwili, gdy zdarzenie faktycznie przychodzi — nie jest to animacja „na pokaz" odpalana z timera, tylko reakcja na prawdziwą wiadomość z `/topic/orders/{id}`.
+Demo aplikacji z mikroserwisami ma jeden wrodzony problem: cała wartość siedzi w miejscach, których nie widać. Osoba oglądająca demo klika „zamów", widzi zmieniający się napis i nie ma pojęcia, że po drodze było wywołanie gRPC, zdarzenie w Kafce i push przez WebSocket. Panel rysuje tę ścieżkę w reakcji na prawdziwe zdarzenia, nie z timera. Pełna ścieżka złożenia zamówienia (REST → gRPC → Kafka) odpala się raz, po udanej odpowiedzi `POST /api/orders` — w tej odpowiedzi jest już cena policzona przez gRPC. Każda kolejna animacja to reakcja na konkretną wiadomość z `/topic/orders/{id}`.
 
 Czas „ms end to end" w logu to różnica między `occurredAt` (ustawianym w `order-service` przy publikacji) a chwilą odebrania wiadomości w przeglądarce. Obejmuje więc Kafkę, konsumenta i WebSocket. Zegary serwera i przeglądarki mogą się różnić, dlatego wartości ujemne albo absurdalnie duże są ukrywane zamiast pokazywane.
 
