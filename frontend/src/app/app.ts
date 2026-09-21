@@ -17,7 +17,7 @@ import { OrderStatusEvent, STATUS_META } from './core/models';
           <img class="brand-mark" src="favicon.svg" alt="" width="32" height="32"> OrderStream
         </a>
         <nav class="nav">
-          <a routerLink="/restaurants" routerLinkActive="active">Restaurants</a>
+          <a routerLink="/restaurants" routerLinkActive="active" class="nav-home">Restaurants</a>
           @if (auth.isLoggedIn()) {
             <a routerLink="/orders" routerLinkActive="active">My orders</a>
             <span class="user-chip" [title]="auth.user()?.email ?? ''">
