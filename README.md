@@ -24,12 +24,13 @@ A food-ordering system built as five Spring Boot microservices with an Angular f
 
 - **The price comes from gRPC.** When you order, `order-service` calls `restaurant-service` synchronously to validate the dishes and compute the total. The browser never sends a price.
 - **Every status change is a Kafka event.** `order-service` publishes, `notification-service` consumes and pushes it to your tab over WebSocket — the tracking page measures that trip end to end, usually in 10–20 ms.
-- **The backend map lights up as it happens.** The panel next to the order draws the path each event took, so what is normally invisible in a demo is the main thing on screen.
+- **The backend map lights up as it happens.** A full-width diagram above the order draws the path each event took, so what is normally invisible in a demo is the main thing on screen. Tap any completed step to replay its path.
 - **One click to try it.** "Try the demo" creates a throwaway account, so nobody has to fill in a form to see it work.
+- **Works on a phone.** Every page is responsive; below tablet width the diagram switches to a vertical layout instead of shrinking.
 
-| Browsing | Ordering |
-|---|---|
-| ![Home page with restaurants](docs/images/home.png) | ![Menu with a filled cart](docs/images/menu.png) |
+| Browsing | Ordering | On a phone |
+|---|---|---|
+| ![Home page with restaurants](docs/images/home.png) | ![Menu with a filled cart](docs/images/menu.png) | ![The backend diagram in its vertical phone layout, mid-animation](docs/images/phone.png) |
 
 ## Architecture
 
