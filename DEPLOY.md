@@ -39,32 +39,48 @@ Also set the gateway's allowed origin to the real domain:
 
 ## 3. Start the stack
 
+The frontend is served by Vercel, so the server runs the backend only. Create `.env` next to the
+compose files:
+
 ```bash
-docker compose -f docker-compose.full.yml up --build -d
-docker compose -f docker-compose.full.yml ps
+cd /opt/orderstream
+cat > .env <<EOF
+JWT_SECRET=$(openssl rand -base64 48)
+CORS_ORIGINS=https://<your-domain>,https://www.<your-domain>
+EOF
+chmod 600 .env
 ```
 
-All services must show `Up`. The first build takes 5–10 minutes.
+`CORS_ORIGINS` takes a comma-separated list — the app answers on the apex and the www host.
 
-## 4. Configure the reverse proxy
+```bash
+docker compose -f docker-compose.full.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.full.yml -f docker-compose.prod.yml ps
+```
+
+All seven containers must show `Up`; the first build takes 5–10 minutes. The production overrides
+add `restart: unless-stopped`, so the stack comes back on its own after a reboot.
+
+## 4. Firewall and reverse proxy
+
+The gateway and the WebSocket service listen on 8080 and 8084. Nothing but nginx should reach
+them, so close everything else:
+
+```bash
+ufw allow OpenSSH
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw --force enable
+```
+
+Then put nginx in front:
 
 ```bash
 cp infra/nginx.conf /etc/nginx/sites-available/orderstream
 ln -s /etc/nginx/sites-available/orderstream /etc/nginx/sites-enabled/orderstream
 rm -f /etc/nginx/sites-enabled/default
-```
-
-Edit `/etc/nginx/sites-available/orderstream` and replace `server_name _;` with your domain:
-
-```nginx
-server_name orderstream.example.com;
-```
-
-Then:
-
-```bash
-nginx -t
-systemctl reload nginx
+sed -i "s/api.example.com/api.<your-domain>/" /etc/nginx/sites-available/orderstream
+nginx -t && systemctl reload nginx
 ```
 
 ## 5. Enable HTTPS

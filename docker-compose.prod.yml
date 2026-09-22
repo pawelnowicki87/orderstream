@@ -1,0 +1,41 @@
+# Production overrides for a single VPS behind nginx.
+#
+#   docker compose -f docker-compose.full.yml -f docker-compose.prod.yml up -d --build
+#
+# Differences from the local stack:
+#   - the frontend is served by Vercel, so its container stays parked behind a profile
+#   - every container restarts by itself after a reboot or a crash
+#   - secrets and the allowed origins come from .env, never from the compose file
+#
+# The gateway (8080) and notification-service (8084) stay published so nginx can reach them;
+# the firewall is what keeps them off the internet, so only 22, 80 and 443 are open.
+services:
+  postgres:
+    restart: unless-stopped
+
+  kafka:
+    restart: unless-stopped
+
+  auth-service:
+    restart: unless-stopped
+    environment:
+      ORDERSTREAM_JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+
+  restaurant-service:
+    restart: unless-stopped
+
+  order-service:
+    restart: unless-stopped
+
+  notification-service:
+    restart: unless-stopped
+
+  api-gateway:
+    restart: unless-stopped
+    environment:
+      ORDERSTREAM_JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      ORDERSTREAM_CORS_ALLOWED-ORIGIN: ${CORS_ORIGINS:?set CORS_ORIGINS in .env}
+
+  # Served by Vercel in production; kept out of the way but still buildable on demand.
+  frontend:
+    profiles: ["containerised-frontend"]
