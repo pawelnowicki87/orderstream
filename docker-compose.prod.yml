@@ -6,35 +6,66 @@
 #   - the frontend is served by Vercel, so its container stays parked behind a profile
 #   - every container restarts by itself after a reboot or a crash
 #   - secrets and the allowed origins come from .env, never from the compose file
+#   - memory is squeezed hard, because the box has 2 GB
 #
 # The gateway (8080) and notification-service (8084) stay published so nginx can reach them;
 # the firewall is what keeps them off the internet, so only 22, 80 and 443 are open.
+#
+# About the heap flags: the whole stack has to fit in 2 GB alongside the OS and Docker.
+# The defaults do not, so every JVM gets a small heap, a capped metaspace and SerialGC.
+# SerialGC matters more than the heap size here — G1 spawns worker threads and reserves
+# native memory per thread, which is pure waste on a two-core box serving a demo.
+# C2 is deliberately left on: the tracking page advertises a Kafka-to-browser latency of
+# 10-20 ms, and interpreting the hot path would show up in that number.
+x-jvm: &jvm >-
+  -Xmx144m -Xms64m
+  -XX:MaxMetaspaceSize=96m
+  -XX:MaxDirectMemorySize=32m
+  -XX:ReservedCodeCacheSize=48m
+  -XX:+UseSerialGC
+  -Xss256k
+
 services:
   postgres:
     restart: unless-stopped
+    # Three small databases for a demo; the defaults reserve far more than they need.
+    command: >-
+      postgres -c shared_buffers=48MB -c max_connections=50
+               -c work_mem=2MB -c maintenance_work_mem=32MB
 
   kafka:
     restart: unless-stopped
+    environment:
+      # The broker defaults to a 1 GB heap, which alone is half the machine.
+      KAFKA_HEAP_OPTS: "-Xmx224m -Xms128m"
 
   auth-service:
     restart: unless-stopped
     environment:
       ORDERSTREAM_JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JAVA_TOOL_OPTIONS: *jvm
 
   restaurant-service:
     restart: unless-stopped
+    environment:
+      JAVA_TOOL_OPTIONS: *jvm
 
   order-service:
     restart: unless-stopped
+    environment:
+      JAVA_TOOL_OPTIONS: *jvm
 
   notification-service:
     restart: unless-stopped
+    environment:
+      JAVA_TOOL_OPTIONS: *jvm
 
   api-gateway:
     restart: unless-stopped
     environment:
       ORDERSTREAM_JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       ORDERSTREAM_CORS_ALLOWED-ORIGIN: ${CORS_ORIGINS:?set CORS_ORIGINS in .env}
+      JAVA_TOOL_OPTIONS: *jvm
 
   # Served by Vercel in production; kept out of the way but still buildable on demand.
   frontend:
