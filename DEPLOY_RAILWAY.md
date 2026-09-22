@@ -1,7 +1,7 @@
 # Deploying OrderStream to Vercel + Railway
 
-The cheap layout: the browser app is served by Vercel, the five services run on Railway,
-and the two stateful pieces are pushed onto services that are free or nearly free.
+The browser app is served by Vercel; the five services, Postgres and Kafka all run on Railway.
+This is the layout the live demo actually runs on.
 
 ```
 Vercel (static Angular)
@@ -12,7 +12,7 @@ api-gateway  ── public domain                notification-service ── pub
    ├── auth-service                          │ consumes
    ├── restaurant-service ◄── gRPC ── order-service ──┘ publishes
    │                                         │
-Neon (auth_db · restaurant_db · order_db)    Redpanda (Kafka API)
+Postgres (auth_db · restaurant_db · order_db)  Kafka (topic: order-events)
 ```
 
 Only two Railway services get a public domain. Everything else talks over the private network
@@ -24,15 +24,15 @@ downstream services trust `X-User-Id`" design defensible.
 Railway bills actual memory and CPU by the second — about **$10 per GB-month** and **$20 per
 vCPU-month** — and does not charge for the number of services. Three things drive the bill down:
 
-| Decision | Saving | Cost to the project |
-|---|---|---|
-| Redpanda instead of Kafka (one native process, not a JVM) | ~$7/mo | none, same wire protocol |
-| Postgres on Neon free tier instead of a Railway container | ~$3/mo | none |
-| `-Xmx192m` + SerialGC on each service | ~$5/mo | none at demo traffic |
+| Decision | Effect |
+|---|---|
+| `-Xmx192m` + SerialGC on each service | ~300 MB per service instead of ~450 MB |
+| Kafka heap capped at 384 MB | the broker fits in ~600 MB |
+| One Postgres instance, three databases | one billed service instead of three |
 
-That lands the whole stack around **$20/month of usage**, which the Pro plan's included $20
-credit covers. Packing the services into one container would *not* help: you pay for the memory
-the JVMs use, not for how many containers hold them.
+That lands the whole stack around **$20–25 of usage per month**, most of which the Pro plan's
+included $20 credit covers. Packing the services into one container would *not* help: you pay for
+the memory the JVMs use, not for how many containers hold them.
 
 **Railway Serverless (app sleeping) will not work here.** It detects idleness from outbound
 traffic, and the docs list open database connections as something that keeps a service awake.
@@ -41,100 +41,118 @@ flowing, so nothing would ever sleep.
 
 ---
 
-## 1. Postgres on Neon
+## 1. Postgres
 
-1. Create a project at <https://neon.tech> — the free tier scales to zero and is plenty here.
-2. Create three databases: `auth_db`, `restaurant_db`, `order_db`.
-3. From the connection details take the host, user and password. The JDBC URL for each service is:
-
-```
-jdbc:postgresql://<neon-host>/auth_db?sslmode=require
+```bash
+railway init --name orderstream
+railway add --database postgres
 ```
 
-Neon suspends an idle database and takes roughly half a second to wake it. Fine for a demo;
-the first request after a quiet night is just slow, not broken.
+Railway's Postgres starts with a single database called `railway`. Create the three the services
+expect — `railway ssh` runs the command inside the container, so the database stays off the public
+internet:
 
-## 2. Redpanda on Railway
-
-New project → **Deploy from Docker image** → `redpandadata/redpanda:latest`. Name the service
-`redpanda`, leave it without a public domain, and set the start command:
-
-```
-redpanda start --node-id 0 --mode dev-container --smp 1 --memory 512M --check=false --kafka-addr PLAINTEXT://0.0.0.0:9092 --advertise-kafka-addr PLAINTEXT://redpanda.railway.internal:9092
+```bash
+railway ssh --service Postgres createdb -U postgres auth_db
+railway ssh --service Postgres createdb -U postgres restaurant_db
+railway ssh --service Postgres createdb -U postgres order_db
 ```
 
-**Untested detail, check it first:** Railway's private network is IPv6. If the services cannot
-reach the broker at `redpanda.railway.internal:9092`, change the two addresses to
-`PLAINTEXT://[::]:9092` and redeploy. The symptom is `Connection to node -1 could not be
-established` in order-service's logs.
+Quoting does not survive `railway ssh`, which is why this uses `createdb` rather than `psql -c`.
+
+## 2. Kafka
+
+```bash
+railway add --service kafka --image apache/kafka:3.9.0 \n  --variables "KAFKA_NODE_ID=1" \n  --variables "KAFKA_PROCESS_ROLES=broker,controller" \n  --variables "KAFKA_LISTENERS=PLAINTEXT://[::]:9092,CONTROLLER://:9093" \n  --variables "KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka.railway.internal:9092" \n  --variables "KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER" \n  --variables "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT" \n  --variables "KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093" \n  --variables "KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT" \n  --variables "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1" \n  --variables "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1" \n  --variables "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1" \n  --variables "KAFKA_AUTO_CREATE_TOPICS_ENABLE=true" \n  --variables "KAFKA_HEAP_OPTS=-Xmx384m -Xms256m"
+```
+
+**`PLAINTEXT://[::]:9092` is the important part.** Railway's private network is IPv6, and a broker
+bound to `0.0.0.0` listens on IPv4 only — the producer would never reach it. The broker confirms the
+right binding in its log: `Awaiting socket connections on 0:0:0:0:0:0:0:0:9092`.
 
 ## 3. The five Java services
 
-For each one: **New service → GitHub repo → this repository**, then in *Settings*:
+Create the services, then set their variables:
 
-- **Root Directory** — the service folder (`auth-service`, `restaurant-service`, …)
-- **Builder** — Dockerfile (Railway picks up the `Dockerfile` already in each folder)
-- **Public Networking** — generate a domain **only** for `api-gateway` and `notification-service`
-
-Railway injects `PORT` into services that have a domain; every `application.yml` already reads
-`${PORT:…}`, so nothing else is needed for that.
-
-### Shared variable
-
-Set on all five services:
-
+```bash
+for s in auth-service restaurant-service order-service notification-service api-gateway; do
+  railway add --service "$s"
+done
 ```
-JAVA_TOOL_OPTIONS = -Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss256k
-```
+
+The repo is a monorepo with one Dockerfile per service. Two things to know:
+
+- `railway up` uploads the **git root**, not the current directory, so running it inside
+  `auth-service/` still ships the whole repo and the builder finds no application. Either set each
+  service's **Root Directory** in the dashboard, or copy the service folder somewhere outside the
+  repository and run `railway up` from there.
+- Spring properties containing a dash (`grpc.client.restaurant-service.address`,
+  `orderstream.cors.allowed-origin`) cannot be expressed as environment variable names. Pass them
+  through `SPRING_APPLICATION_JSON` instead.
+
+### Shared variables
+
+On all five: `JAVA_TOOL_OPTIONS = -Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss256k`
+
+Set `PORT` explicitly on every service (8081–8084, 8080 for the gateway). Railway only injects
+`PORT` where a public domain exists, and the gateway addresses its siblings by those fixed ports.
+
+The Postgres password is in the `Postgres` service's variables (`POSTGRES_PASSWORD`), and the host
+is `postgres.railway.internal`.
 
 ### Per service
 
 **auth-service**
 ```
-SPRING_DATASOURCE_URL      = jdbc:postgresql://<neon-host>/auth_db?sslmode=require
-SPRING_DATASOURCE_USERNAME = <neon-user>
-SPRING_DATASOURCE_PASSWORD = <neon-password>
-ORDERSTREAM_JWT_SECRET     = <openssl rand -base64 48>
+SPRING_DATASOURCE_URL      = jdbc:postgresql://postgres.railway.internal:5432/auth_db
+SPRING_DATASOURCE_USERNAME = postgres
+SPRING_DATASOURCE_PASSWORD = <POSTGRES_PASSWORD>
+ORDERSTREAM_JWT_SECRET     = <a fresh 48-byte secret>
 ```
 
 **restaurant-service**
 ```
-SPRING_DATASOURCE_URL      = jdbc:postgresql://<neon-host>/restaurant_db?sslmode=require
-SPRING_DATASOURCE_USERNAME = <neon-user>
-SPRING_DATASOURCE_PASSWORD = <neon-password>
+SPRING_DATASOURCE_URL      = jdbc:postgresql://postgres.railway.internal:5432/restaurant_db
+SPRING_DATASOURCE_USERNAME = postgres
+SPRING_DATASOURCE_PASSWORD = <POSTGRES_PASSWORD>
+GRPC_SERVER_ADDRESS        = ::
 ```
-If order-service cannot reach it over gRPC, add `GRPC_SERVER_ADDRESS = ::` here — the server
-binds every interface by default, but Railway's IPv6-only private network can need it spelled out.
+`GRPC_SERVER_ADDRESS = ::` is required: the default binds IPv4 and the private network is IPv6.
 
 **order-service**
 ```
-SPRING_DATASOURCE_URL                    = jdbc:postgresql://<neon-host>/order_db?sslmode=require
-SPRING_DATASOURCE_USERNAME               = <neon-user>
-SPRING_DATASOURCE_PASSWORD               = <neon-password>
-SPRING_KAFKA_BOOTSTRAP_SERVERS           = redpanda.railway.internal:9092
-GRPC_CLIENT_RESTAURANT-SERVICE_ADDRESS   = static://restaurant-service.railway.internal:9090
-ORDERSTREAM_DEMO_ADVANCE-INTERVAL-MS     = 15000
+SPRING_DATASOURCE_URL          = jdbc:postgresql://postgres.railway.internal:5432/order_db
+SPRING_DATASOURCE_USERNAME     = postgres
+SPRING_DATASOURCE_PASSWORD     = <POSTGRES_PASSWORD>
+SPRING_KAFKA_BOOTSTRAP_SERVERS = kafka.railway.internal:9092
+SPRING_APPLICATION_JSON        = {"grpc":{"client":{"restaurant-service":{"address":"static://restaurant-service.railway.internal:9090","negotiation-type":"plaintext"}}}}
 ```
 
 **notification-service**
 ```
-SPRING_KAFKA_BOOTSTRAP_SERVERS = redpanda.railway.internal:9092
+SPRING_KAFKA_BOOTSTRAP_SERVERS = kafka.railway.internal:9092
 ```
 
 **api-gateway**
 ```
-ORDERSTREAM_JWT_SECRET            = <the same secret as auth-service, byte for byte>
-ORDERSTREAM_SERVICES_AUTH         = http://auth-service.railway.internal:8081
-ORDERSTREAM_SERVICES_RESTAURANT   = http://restaurant-service.railway.internal:8082
-ORDERSTREAM_SERVICES_ORDER        = http://order-service.railway.internal:8083
-ORDERSTREAM_CORS_ALLOWED-ORIGIN   = https://<your-project>.vercel.app
+ORDERSTREAM_JWT_SECRET          = <the same secret as auth-service, byte for byte>
+ORDERSTREAM_SERVICES_AUTH       = http://auth-service.railway.internal:8081
+ORDERSTREAM_SERVICES_RESTAURANT = http://restaurant-service.railway.internal:8082
+ORDERSTREAM_SERVICES_ORDER      = http://order-service.railway.internal:8083
+SPRING_APPLICATION_JSON         = {"orderstream":{"cors":{"allowed-origin":"https://<your-app>.vercel.app"}}}
 ```
 
-The internal services keep their default ports because Railway only injects `PORT` where a
-domain exists — that is why the three URLs above are explicit about 8081/8082/8083.
+`allowed-origin` accepts a comma-separated list, which matters because Vercel answers on more than
+one hostname.
 
-Deploy in this order so nothing starts against a missing dependency: redpanda → auth,
-restaurant → order, notification → gateway.
+### Domains
+
+```bash
+railway domain --service api-gateway --port 8080
+railway domain --service notification-service --port 8084
+```
+
+Nothing else gets a public domain.
 
 ## 4. The frontend on Vercel
 
@@ -149,7 +167,7 @@ WS_URL       = wss://<notification-service>.up.railway.app/ws
 They are read at build time by `scripts/generate-env.mjs`, which writes
 `src/environments/environment.prod.ts`. Changing a URL means redeploying, not just restarting.
 
-Once Vercel gives you the real domain, put it into the gateway's `ORDERSTREAM_CORS_ALLOWED-ORIGIN`
+Once Vercel gives you the real domain, put it into the gateway's `SPRING_APPLICATION_JSON`
 and redeploy that service. Until then every browser request fails on CORS, which looks like a
 broken backend but is not one.
 
