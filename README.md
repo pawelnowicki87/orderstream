@@ -6,7 +6,7 @@
 
 **Order food and watch it travel through five microservices in real time.**
 
-**[▶ Live demo](https://orderstream-neon.vercel.app)** — one click, no sign-up
+**[▶ Live demo](https://orderstream.pl)** — one click, no sign-up
 
 [![CI](https://github.com/pawelnowicki87/orderstream/actions/workflows/ci.yml/badge.svg)](https://github.com/pawelnowicki87/orderstream/actions/workflows/ci.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
