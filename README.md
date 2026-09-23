@@ -116,8 +116,9 @@ Design decisions and their trade-offs are written up in [DLACZEGO.md](DLACZEGO.m
 
 ## Deployment
 
-- [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) — Vercel for the frontend, Railway for the services, Neon for Postgres and Redpanda for the Kafka API. Written to fit inside a $20/month usage budget.
-- [DEPLOY.md](DEPLOY.md) — everything on one VPS with `docker compose`, behind nginx and certbot.
+- [DEPLOY_AWS.md](DEPLOY_AWS.md) — **what the live demo runs on.** Vercel for the frontend, one 2 GB EC2 instance for everything else, behind nginx and certbot. Includes the measurements behind fitting seven containers into 2 GB, and why the build needs a bigger machine than the runtime.
+- [DEPLOY.md](DEPLOY.md) — the same shape on any other VPS.
+- [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) — an earlier platform-as-a-service layout, kept because the constraints it documents (IPv6-only private networking, properties that cannot be expressed as environment variables) are worth reading before trying something similar.
 
 
 ## Deliberate simplifications
