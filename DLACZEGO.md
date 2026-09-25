@@ -95,6 +95,12 @@ Czas „ms end to end" w logu to różnica między `occurredAt` (ustawianym w `o
 
 Wspólne konto oznaczałoby, że dwie osoby oglądające demo w tym samym czasie widzą nawzajem swoje zamówienia i powiadomienia. Przycisk „Try the demo" rejestruje więc za każdym razem nowego, losowego użytkownika. Kosztem jest rosnąca tabela `app_users` — przy ruchu z portfolio to bez znaczenia.
 
+## Dlaczego formularz logowania jest reaktywny
+
+Formularz z `ngModel` wysyłał do backendu wszystko, co użytkownik wpisał, a o błędzie dowiadywał się dopiero z odpowiedzi 400. Formularz reaktywny (`FormGroup` z `NonNullableFormBuilder`) ma walidatory w kodzie komponentu, więc zasady są w jednym miejscu, da się je przetestować bez klikania po stronie i są te same co w `RegisterRequest` w auth-service: poprawny e-mail, hasło co najmniej 6 znaków, niepuste imię.
+
+Logowanie i rejestracja dzielą jeden formularz, a różnią się regułami. Pole imienia jest w trybie logowania **wyłączone** (`disable()`), a nie tylko ukryte, bo wyłączona kontrolka nie liczy się do walidacji formularza. Hasło przy logowaniu musi być tylko niepuste, bo długość sprawdzano przy rejestracji. Przy rejestracji dochodzi `minLength(6)`. Komunikat o błędzie pojawia się dopiero po opuszczeniu pola albo próbie wysłania, żeby nie krzyczeć po pierwszej literze.
+
 ---
 
 # Nieoczywiste miejsca w konfiguracji
